@@ -15,6 +15,7 @@ namespace MeteoLink.Data.Models
         public string? PasswordHash { get; set; }
 
         [Required]
+        [EmailAddress]
         public string? Email { get; set; }
 
         [Required]

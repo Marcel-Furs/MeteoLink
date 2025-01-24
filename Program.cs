@@ -1,6 +1,12 @@
 
 using MeteoLink.Data;
+using MeteoLink.Mapper;
+using MeteoLink.Repositories;
+using MeteoLink.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace MeteoLink
 {
@@ -11,15 +17,44 @@ namespace MeteoLink
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
+            
+            //Maper i reposytoria
+            builder.Services.AddAutoMapper(typeof(MapperProfile));
+            builder.Services.AddScoped<IUserRepository, UserRepository>();
+            builder.Services.AddScoped<ITokenService, TokenService>();
+            builder.Services.AddScoped<IPasswordHashService, PasswordHashService>();
 
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
+            // Do tokenow i autoryzacji
+            builder.Services.AddAuthentication(x =>
+            {
+                x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                x.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+            }).AddJwtBearer(x =>
+            {
+                x.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = builder.Configuration["Jwt:Issuer"],
+                    ValidAudience = builder.Configuration["Jwt:Audience"],
+                    IssuerSigningKey = new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+
+                };
+            });
+            builder.Services.AddAuthorization();
+
+            // Do bazy danych oraz sqlite
             builder.Services.AddDbContext<DataContext>();
             var connectionString = builder.Configuration.GetConnectionString("ApiDatabase");
-
             builder.Services.AddDbContext<DataContext>(options =>
                 options.UseSqlite(connectionString));
 
@@ -33,6 +68,9 @@ namespace MeteoLink
             }
 
             app.UseHttpsRedirection();
+
+            app.UseAuthentication();
+            app.UseAuthentication();
 
             app.UseAuthorization();
 

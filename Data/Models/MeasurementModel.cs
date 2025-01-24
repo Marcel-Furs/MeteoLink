@@ -11,7 +11,7 @@ namespace MeteoLink.Data.Models
         public int? SensorId { get; set; }
 
         [Required]
-        public int? Value { get; set; }
+        public float? Value { get; set; }
 
         [Required]
         public DateTime? TimeStamp { get; set; }
