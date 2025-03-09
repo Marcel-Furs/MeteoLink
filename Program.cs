@@ -17,12 +17,19 @@ namespace MeteoLink
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
-            
+
+            builder.WebHost.ConfigureKestrel(options =>
+            {
+                options.ListenAnyIP(7203); // Nas³uchuj na porcie 7203 na wszystkich interfejsach
+            });
+
             //Maper i reposytoria
             builder.Services.AddAutoMapper(typeof(MapperProfile));
             builder.Services.AddScoped<IUserRepository, UserRepository>();
             builder.Services.AddScoped<ITokenService, TokenService>();
             builder.Services.AddScoped<IPasswordHashService, PasswordHashService>();
+            builder.Services.AddScoped<DeviceRepository>();
+            builder.Services.AddScoped<MeasurementRepository>();
 
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -58,7 +65,19 @@ namespace MeteoLink
             builder.Services.AddDbContext<DataContext>(options =>
                 options.UseSqlite(connectionString));
 
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll", policy =>
+                {
+                    policy.AllowAnyOrigin()
+                          .AllowAnyMethod()
+                          .AllowAnyHeader();
+                });
+            });
+
             var app = builder.Build();
+
+            app.UseCors("AllowAll");
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
@@ -67,7 +86,7 @@ namespace MeteoLink
                 app.UseSwaggerUI();
             }
 
-            app.UseHttpsRedirection();
+            //app.UseHttpsRedirection();
 
             app.UseAuthentication();
             app.UseAuthentication();

@@ -7,6 +7,6 @@
         public string Type { get; set; }
         public string Unit { get; set; }
 
-        public int DeviceId { get; set; }
+        public int? DeviceId { get; set; }
     }
 }

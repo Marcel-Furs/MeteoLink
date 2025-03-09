@@ -44,7 +44,7 @@ namespace MeteoLink.Controllers
                 }
 
                 var token = _tokenService.CreateToken(user, loginDto.Name);
-                return Ok(new { Token = token });
+                return Ok(new { access = token });
             }
 
             return BadRequest("Invalid body data");

@@ -1,88 +1,104 @@
 ﻿using MeteoLink.Attributes;
+using MeteoLink.Data.Models;
+using MeteoLink.Dto;
+using MeteoLink.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace MeteoLink.Controllers
 {
     [MeteoLinkV1Route]
     [ApiController]
     [Authorize]
-    public class DeviceController : Controller
+    public class DeviceController : ControllerBase
     {
-        // GET: DeviceController
-        public ActionResult Index()
+        private readonly DeviceRepository _repository;
+        private readonly MeasurementRepository _measurementRepo;
+
+        public DeviceController(DeviceRepository repository, MeasurementRepository measurementRepo)
         {
-            return View();
+            _repository = repository;
+            _measurementRepo = measurementRepo;
         }
 
-        // GET: DeviceController/Details/5
-        public ActionResult Details(int id)
-        {
-            return View();
-        }
 
-        // GET: DeviceController/Create
-        public ActionResult Create()
+        [HttpPost("register")]
+        [AllowAnonymous]
+        public async Task<IActionResult> RegisterDeviceWithSensors([FromBody] DeviceDto deviceDto)
         {
-            return View();
-        }
-
-        // POST: DeviceController/Create
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public ActionResult Create(IFormCollection collection)
-        {
-            try
+            if (deviceDto == null || deviceDto.Id == 0 || string.IsNullOrEmpty(deviceDto.Name))
             {
-                return RedirectToAction(nameof(Index));
+                return BadRequest("Device ID and Name are required.");
             }
-            catch
+
+            var device = await _repository.Get(d => d.Id == deviceDto.Id);
+            if (device == null)
             {
-                return View();
+                device = new DeviceModel
+                {
+                    Id = deviceDto.Id,
+                    Name = deviceDto.Name,
+                    UserId = 1, 
+                    Location = deviceDto.Location,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await _repository.Create(device);
             }
+
+            foreach (var sensorDto in deviceDto.Sensors)
+            {
+                var existingSensor = await _measurementRepo.Get(m => m.Sensor.Id == sensorDto.Id);
+                if (existingSensor == null)
+                {
+                    var sensor = new SensorModel
+                    {
+                        Id = sensorDto.Id,
+                        Name = sensorDto.Name,
+                        DeviceId = device.Id,
+                        Type = sensorDto.Type,
+                        Unit = sensorDto.Unit
+                    };
+
+                    await _measurementRepo.CreateSensor(sensor);
+                }
+            }
+
+            return Ok("Device and sensors registered successfully.");
         }
 
-        // GET: DeviceController/Edit/5
-        public ActionResult Edit(int id)
+        [HttpGet("ByUserId/{id}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetDeviceById(int id)
         {
-            return View();
-        }
+            var device = await _repository.GetDeviceByUserId(id);
+            if (device == null)
+            {
+                return NotFound($"Device with Id {id} not found.");
+            }
 
-        // POST: DeviceController/Edit/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public ActionResult Edit(int id, IFormCollection collection)
-        {
-            try
+            var deviceDto = new DeviceDto
             {
-                return RedirectToAction(nameof(Index));
-            }
-            catch
-            {
-                return View();
-            }
-        }
+                Id = device.Id,
+                Name = device.Name,
+                Location = device.Location,
+                CreatedAt = device.CreatedAt
+            };
 
-        // GET: DeviceController/Delete/5
-        public ActionResult Delete(int id)
-        {
-            return View();
-        }
+            var sensors = await _repository.GetSensorsByDeviceId(device.Id);
 
-        // POST: DeviceController/Delete/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public ActionResult Delete(int id, IFormCollection collection)
-        {
-            try
+            deviceDto.Sensors = sensors.Select(sensor => new SensorDto
             {
-                return RedirectToAction(nameof(Index));
-            }
-            catch
-            {
-                return View();
-            }
+                Id = sensor.Id,
+                Name = sensor.Name,
+                Type = sensor.Type,
+                Unit = sensor.Unit,
+                DeviceId = sensor.DeviceId
+            }).ToList();
+
+            return Ok(deviceDto);
         }
     }
 }
